@@ -6,6 +6,7 @@ import staffRoutes from "./routes/staffRoutes.js";
 import leadRoutes from "./routes/leadRoutes.js";
 import customerRoutes from "./routes/customerRoutes.js";
 import quotationsRoutes from "./routes/quotationsRoutes.js";
+import invoiceRoutes from "./routes/invoiceController.js";
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use("/api/staff", staffRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/quotations", quotationsRoutes);
+app.use("/api/invoices", invoiceRoutes);
 
 
 app.get("/", (req, res) => {
