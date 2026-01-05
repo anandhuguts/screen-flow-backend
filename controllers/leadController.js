@@ -4,10 +4,30 @@ export const createLead = async (req, res) => {
   const business_id = req.business_id;
   const user_id = req.user.id;
 
+  const {
+    name,
+    phone,
+    email,
+    address,
+    location,
+    source,
+    status,
+    followUpDate, // camelCase from frontend
+    notes,
+  } = req.body;
+
   const payload = {
-    ...req.body,
     business_id,
     assigned_to: user_id,
+    name,
+    phone,
+    email,
+    address,
+    location,
+    source,
+    status,
+    notes,
+    follow_up_date: followUpDate || null, // ✅ mapped correctly
   };
 
   const { data, error } = await supabaseAdmin
@@ -16,10 +36,14 @@ export const createLead = async (req, res) => {
     .select()
     .single();
 
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    console.error(error);
+    return res.status(400).json({ error: error.message });
+  }
 
   res.json({ success: true, data });
 };
+
 export const getLeads = async (req, res) => {
   const business_id = req.business_id;
 

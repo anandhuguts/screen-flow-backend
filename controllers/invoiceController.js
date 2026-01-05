@@ -1,65 +1,85 @@
+import { createJournalEntry } from "../services/accounting/createJournalEntry.js";
 import { supabaseAdmin } from "../supabase/supabaseAdmin.js";
 
 export async function createInvoice(req, res) {
-  const {
-    customerId,
-    quotationId,
-    items,
-    dueDate,
-    isGstInvoice,
-  } = req.body;
-
-  const business_id = req.business_id;
-
   try {
-    // 1️⃣ Calculate totals server-side
-    const subtotal = items.reduce(
-      (sum, i) => sum + i.quantity * i.unit_price,
-      0
-    );
+    const {
+      customerId,
+      quotationId,
+      subtotal,
+      taxPercent,
+      dueDate,
+      isGstInvoice,
+      notes,
+    } = req.body;
 
-    const taxAmount = isGstInvoice ? subtotal * 0.18 : 0;
-    const totalAmount = subtotal + taxAmount;
+    if (!subtotal) {
+      return res.status(400).json({ error: "Subtotal is required" });
+    }
 
-    const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now()}`;
+    const tax_amount = isGstInvoice
+      ? (subtotal * (taxPercent || 0)) / 100
+      : 0;
 
-    // 2️⃣ Insert invoice
-    const { data: invoice, error } = await supabaseAdmin
-      .from("invoices")
-      .insert({
-        business_id,
-        customer_id: customerId,
-        quotation_id: quotationId || null,
-        invoice_number: invoiceNumber,
-        subtotal,
-        tax_amount: taxAmount,
-        total_amount: totalAmount,
-        paid_amount: 0,
-        balance_amount: totalAmount,
-        due_date: dueDate,
-        is_gst_invoice: isGstInvoice,
-      })
-      .single();
+    const total_amount = subtotal + tax_amount;
+
+    const invoice_number = `INV-${new Date().getFullYear()}-${Date.now()}`;
+
+ const { data, error } = await supabaseAdmin
+  .from("invoices")
+  .insert({
+    business_id: req.business_id,
+    customer_id: customerId,
+    quotation_id: quotationId || null,
+    invoice_number,
+    subtotal,
+    tax_percent: taxPercent || 0,
+    tax_amount,
+    total_amount,
+    paid_amount: 0,
+    balance_amount: total_amount,
+    status: "pending",
+    due_date: dueDate,
+    is_gst_invoice: isGstInvoice,
+    notes,
+  })
+  .select()     // ✅ REQUIRED
+  .single();
+
 
     if (error) throw error;
+    
+    
+    await createJournalEntry({
+  business_id: req.business_id,
+  description: `Invoice ${invoice_number}`,
+  reference_type: "invoice",
+  reference_id: data.id,
+  lines: [
+    {
+      account_code: "1003", // Accounts Receivable
+      debit: total_amount,
+    },
+    {
+      account_code: "4001", // Sales
+      credit: subtotal,
+    },
+    {
+      account_code: "2001", // Tax Payable
+      credit: tax_amount,
+    },
+  ],
+});
 
-    // 3️⃣ Insert items
-    const itemsToInsert = items.map((i) => ({
-      invoice_id: invoice.id,
-      description: i.description,
-      quantity: i.quantity,
-      unit_price: i.unit_price,
-      total: i.quantity * i.unit_price,
-    }));
 
-    await supabaseAdmin.from("invoice_items").insert(itemsToInsert);
-
-    res.json({ success: true, data: invoice });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to create invoice" });
-  }
+    res.json({ success: true, data });
+  }catch (err) {
+  console.error("Invoice creation failed:", err.message);
+  res.status(500).json({ error: err.message });
 }
+
+}
+
 export async function getInvoices(req, res) {
   try {
     const { data, error } = await supabaseAdmin
@@ -79,21 +99,38 @@ export async function recordPayment(req, res) {
   const { invoiceId, amount, paymentMethod, reference } = req.body;
   const business_id = req.business_id;
 
+  if (!invoiceId || !amount || amount <= 0) {
+    return res.status(400).json({ error: "Invalid payment data" });
+  }
+
   try {
-    const { data: invoice } = await supabaseAdmin
+    // 1️⃣ Fetch invoice
+    const { data: invoice, error: invErr } = await supabaseAdmin
       .from("invoices")
       .select("*")
       .eq("id", invoiceId)
+      .eq("business_id", business_id)
       .single();
+
+    if (invErr || !invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+
+    // 2️⃣ Prevent overpayment
+    if (amount > invoice.balance_amount) {
+      return res.status(400).json({ error: "Payment exceeds balance amount" });
+    }
 
     const newPaid = invoice.paid_amount + amount;
     const newBalance = invoice.total_amount - newPaid;
 
     let status = "pending";
-    if (newBalance <= 0) status = "paid";
+    if (newBalance === 0) status = "paid";
     else if (newPaid > 0) status = "partially-paid";
 
-    // 1️⃣ Insert payment
+    const receiptNumber = `RCPT-${new Date().getFullYear()}-${Date.now()}`;
+
+    // 3️⃣ Insert payment
     await supabaseAdmin.from("payments").insert({
       business_id,
       invoice_id: invoiceId,
@@ -101,9 +138,10 @@ export async function recordPayment(req, res) {
       amount,
       payment_method: paymentMethod,
       reference,
+      receipt_number: receiptNumber,
     });
 
-    // 2️⃣ Update invoice
+    // 4️⃣ Update invoice
     await supabaseAdmin
       .from("invoices")
       .update({
@@ -113,8 +151,10 @@ export async function recordPayment(req, res) {
       })
       .eq("id", invoiceId);
 
-    res.json({ success: true });
-  } catch {
+    res.json({ success: true, receiptNumber });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to record payment" });
   }
 }
+
