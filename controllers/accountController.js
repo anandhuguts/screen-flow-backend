@@ -90,3 +90,44 @@ export async function getBalanceSheet(req, res) {
   }
 }
 
+
+export async function getDayBook(req, res) {
+  const business_id = req.business_id;
+  const { date } = req.query;
+
+  try {
+    const targetDate = date || new Date().toISOString().split("T")[0];
+
+    const { data, error } = await supabaseAdmin
+      .from("journal_entries")
+      .select(`
+        id,
+        date,
+        description,
+        reference_type,
+        reference_id,
+        journal_lines (
+          debit,
+          credit,
+          accounts (
+            code,
+            name,
+            type
+          )
+        )
+      `)
+      .eq("business_id", business_id)
+      .eq("date", targetDate)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    res.json({
+      date: targetDate,
+      entries: data || [],
+    });
+  } catch (err) {
+    console.error("Day book error:", err);
+    res.status(500).json({ error: "Failed to load day book" });
+  }
+}

@@ -1,3 +1,4 @@
+import { createJournalEntry } from "../services/accounting/createJournalEntry.js";
 import { supabaseAdmin } from "../supabase/supabaseAdmin.js";
 
 export async function getPayments(req, res) {

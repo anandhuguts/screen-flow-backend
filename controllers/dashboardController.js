@@ -2,6 +2,8 @@ import { supabaseAdmin } from "../supabase/supabaseAdmin.js";
 
 export async function getDashboardData(req, res) {
   const business_id = req.business_id;
+  const userId = req.user.id;
+  const role = req.profile?.role;
 
   try {
     /* ---------------- BASIC COUNTS ---------------- */
@@ -23,7 +25,7 @@ export async function getDashboardData(req, res) {
 
       supabaseAdmin
         .from("invoices")
-        .select("balance_amount", { count: "exact", head: true })
+        .select("id", { count: "exact", head: true })
         .eq("business_id", business_id)
         .gt("balance_amount", 0),
 
@@ -44,21 +46,30 @@ export async function getDashboardData(req, res) {
       .eq("business_id", business_id)
       .gte("payment_date", startOfMonth.toISOString());
 
-    const salesThisMonth = sales?.reduce((s, p) => s + Number(p.amount), 0) || 0;
+    const salesThisMonth =
+      sales?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
 
-    /* ---------------- FOLLOW UPS TODAY ---------------- */
+    /* ---------------- FOLLOW UPS TODAY (COUNT + LIST) ---------------- */
     const today = new Date().toISOString().split("T")[0];
 
-    const { count: followUpsToday } = await supabaseAdmin
+    let followUpQuery = supabaseAdmin
       .from("leads")
-      .select("id", { count: "exact", head: true })
+      .select("id, name, phone, status, follow_up_date")
       .eq("business_id", business_id)
-      .eq("follow_up_date", today);
+      .eq("follow_up_date", today)
+      .neq("status", "lost");
+
+    // 👇 Staff sees only their follow-ups
+    if (role !== "superadmin") {
+      followUpQuery = followUpQuery.eq("assigned_to", userId);
+    }
+
+    const { data: todayFollowUps } = await followUpQuery;
 
     /* ---------------- RECENT LEADS ---------------- */
     const { data: recentLeads } = await supabaseAdmin
       .from("leads")
-      .select("*")
+      .select("id, name, phone, status, created_at")
       .eq("business_id", business_id)
       .order("created_at", { ascending: false })
       .limit(5);
@@ -66,7 +77,7 @@ export async function getDashboardData(req, res) {
     /* ---------------- RECENT INVOICES ---------------- */
     const { data: recentInvoices } = await supabaseAdmin
       .from("invoices")
-      .select("*")
+      .select("id, invoice_number, status, total_amount, due_date")
       .eq("business_id", business_id)
       .order("created_at", { ascending: false })
       .limit(5);
@@ -83,6 +94,7 @@ export async function getDashboardData(req, res) {
       { b_id: business_id }
     );
 
+    /* ---------------- RESPONSE ---------------- */
     res.json({
       stats: {
         totalLeads: leadsCount.count || 0,
@@ -90,8 +102,9 @@ export async function getDashboardData(req, res) {
         pendingPayments: pendingInvoices.count || 0,
         overdueInvoices: overdueInvoices.count || 0,
         salesThisMonth,
-        followUpsToday: followUpsToday || 0,
+        followUpsToday: todayFollowUps?.length || 0,
       },
+      todayFollowUps, // 👈 NEW (used by dashboard UI)
       recentLeads,
       recentInvoices,
       charts: {

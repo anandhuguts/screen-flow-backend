@@ -6,79 +6,152 @@ export async function createInvoice(req, res) {
     const {
       customerId,
       quotationId,
+      items,
       subtotal,
-      taxPercent,
+      taxPercent = 0,
       dueDate,
       isGstInvoice,
       notes,
     } = req.body;
 
-    if (!subtotal) {
-      return res.status(400).json({ error: "Subtotal is required" });
+    /* ---------------- VALIDATION ---------------- */
+
+    if (!customerId && !quotationId) {
+      return res.status(400).json({
+        error: "Either customerId or quotationId is required",
+      });
     }
 
+    if (!dueDate) {
+      return res.status(400).json({
+        error: "Due date is required",
+      });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        error: "Invoice items are required",
+      });
+    }
+
+    for (const item of items) {
+      if (!item.description || item.quantity <= 0 || item.unitPrice <= 0) {
+        return res.status(400).json({
+          error: "Invalid invoice item data",
+        });
+      }
+    }
+
+    /* ---------------- PREVENT DUPLICATE INVOICE ---------------- */
+
+    if (quotationId) {
+      const { data: existingInvoice } = await supabaseAdmin
+        .from("invoices")
+        .select("id")
+        .eq("quotation_id", quotationId)
+        .maybeSingle();
+
+      if (existingInvoice) {
+        return res.status(400).json({
+          error: "Invoice already exists for this quotation",
+        });
+      }
+    }
+
+    /* ---------------- RESOLVE CUSTOMER ---------------- */
+
+    let finalCustomerId = customerId;
+
+    if (!finalCustomerId && quotationId) {
+      const { data: quotation } = await supabaseAdmin
+        .from("quotations")
+        .select("customer_id")
+        .eq("id", quotationId)
+        .single();
+
+      if (!quotation?.customer_id) {
+        return res.status(400).json({
+          error: "Quotation has no customer linked",
+        });
+      }
+
+      finalCustomerId = quotation.customer_id;
+    }
+
+    /* ---------------- CALCULATIONS ---------------- */
+
     const tax_amount = isGstInvoice
-      ? (subtotal * (taxPercent || 0)) / 100
+      ? (subtotal * taxPercent) / 100
       : 0;
 
     const total_amount = subtotal + tax_amount;
 
     const invoice_number = `INV-${new Date().getFullYear()}-${Date.now()}`;
 
- const { data, error } = await supabaseAdmin
-  .from("invoices")
-  .insert({
-    business_id: req.business_id,
-    customer_id: customerId,
-    quotation_id: quotationId || null,
-    invoice_number,
-    subtotal,
-    tax_percent: taxPercent || 0,
-    tax_amount,
-    total_amount,
-    paid_amount: 0,
-    balance_amount: total_amount,
-    status: "pending",
-    due_date: dueDate,
-    is_gst_invoice: isGstInvoice,
-    notes,
-  })
-  .select()     // ✅ REQUIRED
-  .single();
+    /* ---------------- INSERT INVOICE ---------------- */
 
+    const { data: invoice, error: invoiceError } = await supabaseAdmin
+      .from("invoices")
+      .insert({
+        business_id: req.business_id,
+        customer_id: finalCustomerId,
+        quotation_id: quotationId || null,
+        invoice_number,
+        subtotal,
+        tax_percent: taxPercent,
+        tax_amount,
+        total_amount,
+        paid_amount: 0,
+        balance_amount: total_amount,
+        status: "pending",
+        due_date: dueDate,
+        is_gst_invoice: isGstInvoice,
+        notes,
+      })
+      .select()
+      .single();
 
-    if (error) throw error;
-    
-    
+    if (invoiceError) throw invoiceError;
+
+    /* ---------------- INSERT ITEMS ---------------- */
+
+    const invoiceItems = items.map((item) => ({
+      invoice_id: invoice.id,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      total: item.quantity * item.unitPrice,
+    }));
+
+    const { error: itemsError } = await supabaseAdmin
+      .from("invoice_items")
+      .insert(invoiceItems);
+
+    if (itemsError) throw itemsError;
+
+    /* ---------------- JOURNAL ENTRY ---------------- */
+
     await createJournalEntry({
-  business_id: req.business_id,
-  description: `Invoice ${invoice_number}`,
-  reference_type: "invoice",
-  reference_id: data.id,
-  lines: [
-    {
-      account_code: "1003", // Accounts Receivable
-      debit: total_amount,
-    },
-    {
-      account_code: "4001", // Sales
-      credit: subtotal,
-    },
-    {
-      account_code: "2001", // Tax Payable
-      credit: tax_amount,
-    },
-  ],
-});
+      business_id: req.business_id,
+      description: `Invoice ${invoice_number}`,
+      reference_type: "invoice",
+      reference_id: invoice.id,
+      lines: [
+        { account_code: "1003", debit: total_amount },
+        { account_code: "4001", credit: subtotal },
+        { account_code: "2001", credit: tax_amount },
+      ],
+    });
 
-
-    res.json({ success: true, data });
-  }catch (err) {
-  console.error("Invoice creation failed:", err.message);
-  res.status(500).json({ error: err.message });
+    res.json({ success: true, data: invoice });
+  } catch (err) {
+    console.error("Invoice creation failed:", err);
+    res.status(500).json({ error: err.message });
+  }
 }
 
-}
+
+
 
 export async function getInvoices(req, res) {
   try {

@@ -119,7 +119,7 @@ export async function convertLead(req, res) {
 
   try {
     // 1️⃣ Fetch lead
-    const { data: lead, error: leadError } = await supabase
+    const { data: lead, error: leadError } = await supabaseAdmin
       .from("leads")
       .select("*")
       .eq("id", leadId)
@@ -135,7 +135,7 @@ export async function convertLead(req, res) {
     }
 
     // 3️⃣ Create customer from lead
-    const { data: customer, error: customerError } = await supabase
+    const { data: customer, error: customerError } = await supabaseAdmin
       .from("customers")
       .insert({
         business_id: lead.business_id,
@@ -152,7 +152,7 @@ export async function convertLead(req, res) {
     if (customerError) throw customerError;
 
     // 4️⃣ Update lead status
-    await supabase
+    await supabaseAdmin
       .from("leads")
       .update({ status: "converted" })
       .eq("id", lead.id);
@@ -166,3 +166,48 @@ export async function convertLead(req, res) {
     res.status(500).json({ error: "Conversion failed" });
   }
 }
+
+export const getLeadNotes = async (req, res) => {
+  const { leadId } = req.params;
+  const business_id = req.business_id;
+
+  const { data, error } = await supabaseAdmin
+    .from("lead_notes")
+    .select(`
+      id,
+      note,
+      note_date,
+      created_at,
+      profiles(name)
+    `)
+    .eq("lead_id", leadId)
+    .eq("business_id", business_id)
+    .order("created_at", { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  res.json({ data });
+};
+
+export const addLeadNote = async (req, res) => {
+  const { leadId } = req.params;
+  const business_id = req.business_id;
+  const user_id = req.user.id;
+  const { note, noteDate } = req.body;
+
+  const { data, error } = await supabaseAdmin
+    .from("lead_notes")
+    .insert({
+      business_id,
+      lead_id: leadId,
+      user_id,
+      note,
+      note_date: noteDate || new Date(),
+    })
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  res.json({ success: true, data });
+};
