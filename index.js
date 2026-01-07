@@ -16,10 +16,28 @@ import settingsRoutes from "./routes/settingsRoutes.js";
 import securityRoutes from "./routes/securityRoutes.js";
 const app = express();
 
-app.use(cors({
-  origin: "http://localhost:8080", // your React URL
-  credentials: true
-}));
+const allowedOrigins = [
+  "http://localhost:8080",
+  "http://localhost:3000",
+  "https://screenflow-accounting.vercel.app",
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin (like Postman)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
+
 
 app.use(express.json());
 
