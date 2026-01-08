@@ -14,6 +14,8 @@ import authRoutes from "./routes/authRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import securityRoutes from "./routes/securityRoutes.js";
+import notificationRoutes from "./routes/notificationRouter.js";
+
 const app = express();
 
 const allowedOrigins = [
@@ -53,6 +55,7 @@ app.use("/api/accounts", accountRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/security", securityRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 
 
