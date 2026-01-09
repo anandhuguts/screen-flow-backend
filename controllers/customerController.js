@@ -77,11 +77,18 @@ export const createCustomer = async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Customer insert error:", error);
+      return res.status(400).json({
+        error: error.message || "Failed to create customer"
+      });
+    }
 
     res.status(201).json({ data });
-  } catch {
-    res.status(500).json({ error: "Failed to create customer" });
+  } catch (err) {
+    console.error("Create customer error:", err);
+    const errorMessage = err.message || err.msg || "Failed to create customer. Please try again.";
+    res.status(500).json({ error: errorMessage });
   }
 };
 
@@ -114,11 +121,18 @@ export const updateCustomer = async (req, res) => {
       .eq("id", id)
       .eq("business_id", businessId);
 
-    if (error) throw error;
+    if (error) {
+      console.error("Customer update error:", error);
+      return res.status(400).json({
+        error: error.message || "Failed to update customer"
+      });
+    }
 
     res.json({ success: true });
-  } catch {
-    res.status(500).json({ error: "Failed to update customer" });
+  } catch (err) {
+    console.error("Update customer error:", err);
+    const errorMessage = err.message || err.msg || "Failed to update customer. Please try again.";
+    res.status(500).json({ error: errorMessage });
   }
 };
 
@@ -134,10 +148,17 @@ export const deleteCustomer = async (req, res) => {
       .eq("id", id)
       .eq("business_id", businessId);
 
-    if (error) throw error;
+    if (error) {
+      console.error("Customer delete error:", error);
+      return res.status(400).json({
+        error: error.message || "Failed to delete customer"
+      });
+    }
 
     res.json({ success: true });
-  } catch {
-    res.status(500).json({ error: "Failed to delete customer" });
+  } catch (err) {
+    console.error("Delete customer error:", err);
+    const errorMessage = err.message || err.msg || "Failed to delete customer. Please try again.";
+    res.status(500).json({ error: errorMessage });
   }
 };

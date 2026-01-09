@@ -111,7 +111,12 @@ export async function createInvoice(req, res) {
       .select()
       .single();
 
-    if (invoiceError) throw invoiceError;
+    if (invoiceError) {
+      console.error("Invoice insert error:", invoiceError);
+      return res.status(400).json({
+        error: invoiceError.message || "Failed to create invoice"
+      });
+    }
 
     /* ---------------- INSERT ITEMS ---------------- */
 
@@ -127,26 +132,43 @@ export async function createInvoice(req, res) {
       .from("invoice_items")
       .insert(invoiceItems);
 
-    if (itemsError) throw itemsError;
+    if (itemsError) {
+      console.error("Invoice items insert error:", itemsError);
+      // Rollback: delete the invoice we just created
+      await supabaseAdmin
+        .from("invoices")
+        .delete()
+        .eq("id", invoice.id);
+
+      return res.status(400).json({
+        error: itemsError.message || "Failed to add invoice items"
+      });
+    }
 
     /* ---------------- JOURNAL ENTRY ---------------- */
 
-    await createJournalEntry({
-      business_id: req.business_id,
-      description: `Invoice ${invoice_number}`,
-      reference_type: "invoice",
-      reference_id: invoice.id,
-      lines: [
-        { account_code: "1003", debit: total_amount },
-        { account_code: "4001", credit: subtotal },
-        { account_code: "2001", credit: tax_amount },
-      ],
-    });
+    try {
+      await createJournalEntry({
+        business_id: req.business_id,
+        description: `Invoice ${invoice_number}`,
+        reference_type: "invoice",
+        reference_id: invoice.id,
+        lines: [
+          { account_code: "1003", debit: total_amount },
+          { account_code: "4001", credit: subtotal },
+          { account_code: "2001", credit: tax_amount },
+        ],
+      });
+    } catch (journalError) {
+      console.error("Journal entry error:", journalError);
+      // Continue anyway - invoice is created, journal is optional
+    }
 
     res.json({ success: true, data: invoice });
   } catch (err) {
     console.error("Invoice creation failed:", err);
-    res.status(500).json({ error: err.message });
+    const errorMessage = err.message || err.msg || "Failed to create invoice. Please try again.";
+    res.status(500).json({ error: errorMessage });
   }
 }
 

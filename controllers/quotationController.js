@@ -46,7 +46,12 @@ export async function createQuotation(req, res) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Quotation insert error:", error);
+      return res.status(400).json({
+        error: error.message || "Failed to create quotation"
+      });
+    }
 
     // Insert quotation items
     const itemsPayload = items.map((item) => ({
@@ -63,12 +68,24 @@ export async function createQuotation(req, res) {
       .from("quotation_items")
       .insert(itemsPayload);
 
-    if (itemsError) throw itemsError;
+    if (itemsError) {
+      console.error("Quotation items insert error:", itemsError);
+      // Rollback: delete the quotation we just created
+      await supabaseAdmin
+        .from("quotations")
+        .delete()
+        .eq("id", quotation.id);
+
+      return res.status(400).json({
+        error: itemsError.message || "Failed to add quotation items"
+      });
+    }
 
     res.json({ success: true, data: quotation });
   } catch (err) {
     console.error("Create quotation error:", err);
-    res.status(500).json({ error: "Failed to create quotation" });
+    const errorMessage = err.message || err.msg || "Failed to create quotation. Please try again.";
+    res.status(500).json({ error: errorMessage });
   }
 }
 
