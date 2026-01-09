@@ -5,15 +5,45 @@ export const getCustomers = async (req, res) => {
   try {
     const businessId = req.business_id;
 
+    // Get pagination parameters from query string
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Calculate offset
+    const offset = (page - 1) * limit;
+
+    // Get total count of customers for this business
+    const { count, error: countError } = await supabaseAdmin
+      .from("customers")
+      .select("*", { count: "exact", head: true })
+      .eq("business_id", businessId);
+
+    if (countError) throw countError;
+
+    // Get paginated data
     const { data, error } = await supabaseAdmin
       .from("customers")
       .select("*")
       .eq("business_id", businessId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
 
-    res.json({ data });
+    // Calculate total pages
+    const totalPages = Math.ceil(count / limit);
+
+    res.json({
+      data,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: count,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch customers" });
   }

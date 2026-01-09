@@ -47,3 +47,19 @@ export async function outstandingReport(req, res) {
   if (error) return res.status(500).json({ error: error.message });
   res.json({ data });
 }
+
+export async function profitLossReport(req, res) {
+  const { from, to } = req.query;
+
+  const { data, error } = await supabaseAdmin.rpc("report_profit_loss", {
+    biz_id: req.business_id,
+    from_date: from,
+    to_date: to,
+  });
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json({ data });
+}

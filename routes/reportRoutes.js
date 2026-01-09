@@ -4,6 +4,7 @@ import {
   salesSummary,
   paymentReport,
   outstandingReport,
+  profitLossReport,
 } from "../controllers/ReportsController.js";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { requireStaffOrAdmin } from "../middlewares/requireStaffOrAdmin.js";
@@ -14,5 +15,6 @@ router.get("/leads", requireAuth,requireStaffOrAdmin, leadReport);
 router.get("/sales-summary", requireAuth,requireStaffOrAdmin, salesSummary);
 router.get("/payments", requireAuth,requireStaffOrAdmin, paymentReport);
 router.get("/outstanding", requireAuth,requireStaffOrAdmin, outstandingReport);
+router.get("/profit-loss", requireAuth,requireStaffOrAdmin, profitLossReport);
 
 export default router;

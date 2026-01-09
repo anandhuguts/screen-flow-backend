@@ -3,6 +3,22 @@ import { supabaseAdmin } from "../supabase/supabaseAdmin.js";
 
 export async function getPayments(req, res) {
   try {
+    // Get pagination parameters from query string
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Calculate offset
+    const offset = (page - 1) * limit;
+
+    // Get total count of payments for this business
+    const { count, error: countError } = await supabaseAdmin
+      .from("payments")
+      .select("*", { count: "exact", head: true })
+      .eq("business_id", req.business_id);
+
+    if (countError) throw countError;
+
+    // Get paginated data
     const { data, error } = await supabaseAdmin
       .from("payments")
       .select(`
@@ -16,11 +32,25 @@ export async function getPayments(req, res) {
         created_at
       `)
       .eq("business_id", req.business_id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
 
-    res.json({ data });
+    // Calculate total pages
+    const totalPages = Math.ceil(count / limit);
+
+    res.json({
+      data,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: count,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to load payments" });
@@ -71,22 +101,22 @@ export async function recordPayment(req, res) {
     }
 
     await createJournalEntry({
-  business_id,
-  description: `Payment received for ${invoice.invoice_number}`,
-  reference_type: "payment",
-  reference_id: invoiceId,
-  lines: [
-    {
-      account_code:
-        paymentMethod === "cash" ? "1001" : "1002", // Cash or Bank
-      debit: amount,
-    },
-    {
-      account_code: "1003", // Accounts Receivable
-      credit: amount,
-    },
-  ],
-});
+      business_id,
+      description: `Payment received for ${invoice.invoice_number}`,
+      reference_type: "payment",
+      reference_id: invoiceId,
+      lines: [
+        {
+          account_code:
+            paymentMethod === "cash" ? "1001" : "1002", // Cash or Bank
+          debit: amount,
+        },
+        {
+          account_code: "1003", // Accounts Receivable
+          credit: amount,
+        },
+      ],
+    });
 
 
     // ✅ 2️⃣ UPDATE INVOICE ONLY AFTER PAYMENT SUCCESS

@@ -49,20 +49,51 @@ export const getAllStaff = async (req, res) => {
   try {
     const business_id = req.business_id;
 
+    // Get pagination parameters from query string
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Calculate offset
+    const offset = (page - 1) * limit;
+
+    // Get total count of staff for this business
+    const { count, error: countError } = await supabaseAdmin
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("business_id", business_id)
+      .neq("role", "superadmin");
+
+    if (countError) {
+      return res.status(400).json({ error: countError.message });
+    }
+
+    // Get paginated data
     const { data, error } = await supabaseAdmin
       .from("profiles")
       .select("id, name, role, created_at, is_active")
       .eq("business_id", business_id)
       .neq("role", "superadmin")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       return res.status(400).json({ error: error.message });
     }
 
+    // Calculate total pages
+    const totalPages = Math.ceil(count / limit);
+
     res.json({
       success: true,
       data,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: count,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
     });
   } catch (err) {
     console.error("Get staff error:", err);

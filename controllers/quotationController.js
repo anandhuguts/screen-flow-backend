@@ -74,6 +74,22 @@ export async function createQuotation(req, res) {
 
 export async function getQuotations(req, res) {
   try {
+    // Get pagination parameters from query string
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Calculate offset
+    const offset = (page - 1) * limit;
+
+    // Get total count of quotations for this business
+    const { count, error: countError } = await supabaseAdmin
+      .from("quotations")
+      .select("*", { count: "exact", head: true })
+      .eq("business_id", req.business_id);
+
+    if (countError) throw countError;
+
+    // Get paginated data
     const { data, error } = await supabaseAdmin
       .from("quotations")
       .select(`
@@ -89,7 +105,8 @@ export async function getQuotations(req, res) {
         )
       `)
       .eq("business_id", req.business_id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
 
@@ -122,7 +139,20 @@ export async function getQuotations(req, res) {
       }))
     }));
 
-    res.json({ data: formatted });
+    // Calculate total pages
+    const totalPages = Math.ceil(count / limit);
+
+    res.json({
+      data: formatted,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: count,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    });
   } catch (err) {
     console.error("Get quotations error:", err);
     res.status(500).json({ error: "Failed to load quotations" });

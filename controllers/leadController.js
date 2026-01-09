@@ -47,15 +47,45 @@ export const createLead = async (req, res) => {
 export const getLeads = async (req, res) => {
   const business_id = req.business_id;
 
+  // Get pagination parameters from query string
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 5;
+
+  // Calculate offset
+  const offset = (page - 1) * limit;
+
+  // Get total count of leads for this business
+  const { count, error: countError } = await supabaseAdmin
+    .from("leads")
+    .select("*", { count: "exact", head: true })
+    .eq("business_id", business_id);
+
+  if (countError) return res.status(400).json({ error: countError.message });
+
+  // Get paginated data
   const { data, error } = await supabaseAdmin
     .from("leads")
     .select("*")
     .eq("business_id", business_id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) return res.status(400).json({ error: error.message });
 
-  res.json({ data });
+  // Calculate total pages
+  const totalPages = Math.ceil(count / limit);
+
+  res.json({
+    data,
+    pagination: {
+      currentPage: page,
+      totalPages,
+      totalItems: count,
+      itemsPerPage: limit,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1
+    }
+  });
 };
 export const updateLead = async (req, res) => {
   try {
