@@ -1,5 +1,6 @@
 // backend/controllers/quotations.js
 import { supabaseAdmin } from "../supabase/supabaseAdmin.js";
+import { convertLeadToCustomer } from "./leadController.js";
 
 export async function createQuotation(req, res) {
   const {
@@ -17,6 +18,32 @@ export async function createQuotation(req, res) {
   const business_id = req.business_id;
 
   try {
+    // If no customer is provided but a lead is, convert the lead to customer first
+    let finalCustomerId = customerId;
+    let finalLeadId = leadId;
+
+    if (!customerId && leadId) {
+      try {
+        const customer = await convertLeadToCustomer(leadId, business_id);
+        finalCustomerId = customer.id;
+        // Clear leadId after conversion - quotation should be linked to customer, not lead
+        // This avoids violating the quotation_target_check constraint (either customer OR lead, not both)
+        finalLeadId = null;
+      } catch (conversionError) {
+        console.error("Lead to customer conversion error:", conversionError);
+        return res.status(400).json({
+          error: conversionError.message || "Failed to convert lead to customer"
+        });
+      }
+    }
+
+    // Validate that we have either a customer or a lead
+    if (!finalCustomerId && !finalLeadId) {
+      return res.status(400).json({
+        error: "Quotation must have a customer. Please provide a customerId or a valid leadId."
+      });
+    }
+
     // Calculate totals
     const discountAmount = (subtotal * (discountPercent || 0)) / 100;
     const taxable = subtotal - discountAmount;
@@ -31,8 +58,8 @@ export async function createQuotation(req, res) {
       .insert({
         business_id,
         quotation_number: quotationNumber,
-        customer_id: customerId || null,
-        lead_id: leadId || null,
+        customer_id: finalCustomerId || null,
+        lead_id: finalLeadId || null,
         subtotal,
         discount_percent: discountPercent || 0,
         discount_amount: discountAmount,
