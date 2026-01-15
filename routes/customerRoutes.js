@@ -7,13 +7,13 @@ import {
   updateCustomer,
   deleteCustomer,
 } from "../controllers/customerController.js";
-import { requireBusiness } from "../middlewares/requireBusiness.js";
+
 
 const router = express.Router();
 
-router.get("/", requireAuth, requireBusiness, getCustomers);
-router.post("/", requireAuth, requireStaffOrAdmin, requireBusiness, createCustomer);
-router.patch("/:id", requireAuth, requireStaffOrAdmin, requireBusiness, updateCustomer);
-router.delete("/:id", requireAuth, requireStaffOrAdmin, requireBusiness, deleteCustomer);
+router.get("/", requireAuth, requireStaffOrAdmin, getCustomers);
+router.post("/", requireAuth, requireStaffOrAdmin, createCustomer);
+router.patch("/:id", requireAuth, requireStaffOrAdmin, updateCustomer);
+router.delete("/:id", requireAuth, requireStaffOrAdmin, deleteCustomer);
 
 export default router;

@@ -15,6 +15,7 @@ import reportRoutes from "./routes/reportRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import securityRoutes from "./routes/securityRoutes.js";
 import notificationRoutes from "./routes/notificationRouter.js";
+import expenseRoutes from "./routes/expenseRoutes.js";
 
 const app = express();
 
@@ -56,6 +57,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/security", securityRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/expenses", expenseRoutes);
 
 
 
