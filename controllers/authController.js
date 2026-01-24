@@ -1,40 +1,26 @@
 import { supabaseAdmin } from "../supabase/supabaseAdmin.js";
 
+// ========================================
+// DEPRECATED: completeSignup
+// ========================================
+// This function is deprecated. Signup is now invitation-only.
+// Users must receive an invitation from a system superadmin or business owner.
+// Use invitationController.acceptInvitation() instead.
 
+// Keep this function temporarily for backwards compatibility
+// TODO: Remove after frontend is updated
 export async function completeSignup(req, res) {
-  try {
-    const { userId, name } = req.body;
-
-    // 1️⃣ Create business
-    const { data: business, error } = await supabaseAdmin
-      .from("businesses")
-      .insert({
-        name: `${name}'s Business`,
-        owner_id: userId,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // 2️⃣ Create profile
-    await supabaseAdmin.from("profiles").insert({
-      id: userId,
-      name,
-      role: "superadmin",
-      business_id: business.id,
-    });
-
-    // 3️⃣ Seed Chart of Accounts ✅
-    await seedDefaultAccounts(business.id);
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Signup failed" });
-  }
+  return res.status(410).json({ 
+    error: "Self-service signup is no longer available",
+    message: "Please contact your administrator for an invitation to join",
+    action: "invitation_required"
+  });
 }
 
+// ========================================
+// Helper: Seed Default Chart of Accounts
+// ========================================
+// This function is used by superadminController when creating new businesses
 export async function seedDefaultAccounts(business_id) {
   const accounts = [
     // Asset Accounts
@@ -67,4 +53,5 @@ export async function seedDefaultAccounts(business_id) {
     accounts.map(a => ({ ...a, business_id }))
   );
 }
+
 

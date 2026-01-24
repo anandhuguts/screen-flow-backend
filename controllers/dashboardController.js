@@ -83,10 +83,10 @@ export async function getDashboardData(req, res) {
       .limit(5);
 
     /* ---------------- LEAD SOURCE CHART ---------------- */
-    const { data: leadSources } = await supabaseAdmin
-      .from("leads")
-      .select("source, count:source", { group: "source" })
-      .eq("business_id", business_id);
+    const { data: leadSources } = await supabaseAdmin.rpc(
+      "get_lead_sources",
+      { b_id: business_id }
+    );
 
     /* ---------------- MONTHLY SALES CHART ---------------- */
     const { data: monthlySales } = await supabaseAdmin.rpc(

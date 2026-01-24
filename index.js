@@ -17,6 +17,11 @@ import securityRoutes from "./routes/securityRoutes.js";
 import notificationRoutes from "./routes/notificationRouter.js";
 import expenseRoutes from "./routes/expenseRoutes.js";
 
+// Subscription system routes
+import superadminRoutes from "./routes/superadminRoutes.js";
+import subscriptionRoutes from "./routes/subscriptionRoutes.js";
+import invitationRoutes from "./routes/invitationRoutes.js";
+
 const app = express();
 
 const allowedOrigins = [
@@ -44,7 +49,15 @@ app.use(
 
 app.use(express.json());
 
+// Core routes
 app.use("/api/auth", authRoutes);
+
+// Subscription system routes (NEW)
+app.use("/api/superadmin", superadminRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/invitations", invitationRoutes);
+
+// Business feature routes
 app.use("/api/staff", staffRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/customers", customerRoutes);

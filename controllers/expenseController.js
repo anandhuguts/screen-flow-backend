@@ -63,7 +63,7 @@ export async function createExpense(req, res) {
             reference,
             notes,
         } = req.body;
-
+console.log(req.body);
         /* ---------------- VALIDATION ---------------- */
         if (!category || !vendorName || !amount || !description || !expenseDate) {
             return res.status(400).json({

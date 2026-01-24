@@ -14,6 +14,8 @@ export async function createInvoice(req, res) {
       notes,
     } = req.body;
 
+
+    console.log(req.body);
     /* ---------------- VALIDATION ---------------- */
 
     if (!customerId && !quotationId) {
@@ -223,6 +225,7 @@ export async function getInvoices(req, res) {
 export async function recordPayment(req, res) {
   const { invoiceId, amount, paymentMethod, reference } = req.body;
   const business_id = req.business_id;
+  console.log(req.body);
 
   if (!invoiceId || !amount || amount <= 0) {
     return res.status(400).json({ error: "Invalid payment data" });
