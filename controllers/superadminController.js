@@ -31,17 +31,16 @@ export async function createBusiness(req, res) {
       });
     }
 
-    // Check if email already exists in users
-    const { data: existingUser } = await supabaseAdmin
-      .from('profiles')
-      .select('id, name, business_id')
-      .eq('id', owner_email)
-      .single();
-
-    if (existingUser) {
-      return res.status(400).json({ 
-        error: "A user with this email already exists and is associated with another business" 
-      });
+    // Check if email already exists in auth system
+    const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (!authError) {
+      const existingAuthUser = authUsers.users.find(u => u.email === owner_email);
+      if (existingAuthUser) {
+        return res.status(400).json({ 
+          error: "A user with this email already exists in the system" 
+        });
+      }
     }
 
     // Check if there's already a pending invitation for this email
