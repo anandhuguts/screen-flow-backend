@@ -31,16 +31,30 @@ export async function createBusiness(req, res) {
       });
     }
 
-    // Check if email already exists
+    // Check if email already exists in users
     const { data: existingUser } = await supabaseAdmin
       .from('profiles')
-      .select('id, name')
+      .select('id, name, business_id')
       .eq('id', owner_email)
       .single();
 
     if (existingUser) {
       return res.status(400).json({ 
-        error: "A user with this email already exists" 
+        error: "A user with this email already exists and is associated with another business" 
+      });
+    }
+
+    // Check if there's already a pending invitation for this email
+    const { data: existingInvite } = await supabaseAdmin
+      .from('business_invitations')
+      .select('id, business_id, status')
+      .eq('email', owner_email)
+      .eq('status', 'pending')
+      .single();
+
+    if (existingInvite) {
+      return res.status(400).json({ 
+        error: "An invitation has already been sent to this email. Please wait for them to accept or cancel the existing invitation first." 
       });
     }
 
