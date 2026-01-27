@@ -81,4 +81,5 @@ app.get("/", (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`📧 FRONTEND_URL: ${process.env.FRONTEND_URL || 'NOT SET (will use localhost:3000)'}`);
 });

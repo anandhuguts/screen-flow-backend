@@ -26,13 +26,21 @@ export const sendEmail = async (to, subject, html) => {
   }
 
   try {
+    console.log(`📧 Attempting to send email to: ${to}`);
+    console.log(`📧 Subject: ${subject}`);
+    
     const info = await transporter.sendMail({
       from: `"${process.env.SMTP_FROM_NAME || 'ScreenFlow'}" <${process.env.SMTP_USER}>`,
       to,
       subject,
       html,
     });
-    console.log("Message sent: %s", info.messageId);
+    
+    console.log("✅ Message sent successfully!");
+    console.log("📬 Message ID:", info.messageId);
+    console.log("📨 Response:", info.response);
+    console.log("👤 Sent to:", to);
+    
     return info;
   } catch (error) {
     console.error("Error sending email:", error);

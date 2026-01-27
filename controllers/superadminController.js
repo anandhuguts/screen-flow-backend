@@ -222,11 +222,16 @@ export async function getAllBusinesses(req, res) {
 
     if (error) throw error;
 
+    console.log('🔍 BACKEND - Raw businesses from DB:', JSON.stringify(businesses?.slice(0, 1), null, 2));
+
     // Enhance with plan details
+    // Note: Supabase returns subscriptions as an OBJECT (not array) because business_id is UNIQUE
     const enrichedBusinesses = businesses.map(business => ({
       ...business,
-      subscription: business.subscriptions?.[0] || null
+      subscription: business.subscriptions || null  // Fixed: don't use [0], it's already an object!
     }));
+    
+    console.log('🔍 BACKEND - Enriched business:', JSON.stringify(enrichedBusinesses?.slice(0, 1), null, 2));
 
     res.json({
       success: true,
